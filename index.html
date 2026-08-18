@@ -10,7 +10,7 @@
 :root{
   --paper:#FBFAF7; --card:#FFFFFF; --ink:#1C2B3A; --soft:#63717F;
   --line:#E8E4DB; --shu:#D8442E; --shu-bg:#FBE3DE;
-  --c-word:#1F8A82; --c-sent:#3B5BA5; --c-long:#B0791E;
+  --c-word:#1F8A82; --c-sent:#3B5BA5; --c-long:#B0791E; --c-gram:#7A5AA5;
   --radius:14px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -55,6 +55,7 @@ main{margin-top:14px;display:flex;flex-direction:column;gap:10px}
 .card.word{border-left-color:var(--c-word)}
 .card.sent{border-left-color:var(--c-sent)}
 .card.long{border-left-color:var(--c-long)}
+.card.gram{border-left-color:var(--c-gram)}
 .jp{font-size:1.28rem;font-weight:600;letter-spacing:.01em;line-height:1.5;padding-right:34px}
 .zh{margin-top:5px;color:#33414f;font-size:1rem}
 .note{margin-top:9px;font-size:.86rem;color:var(--soft);white-space:pre-wrap;
@@ -64,6 +65,7 @@ main{margin-top:14px;display:flex;flex-direction:column;gap:10px}
 .tag.cat-word{background:rgba(31,138,130,.12);color:var(--c-word)}
 .tag.cat-sent{background:rgba(59,91,165,.12);color:var(--c-sent)}
 .tag.cat-long{background:rgba(176,121,30,.14);color:var(--c-long)}
+.tag.cat-gram{background:rgba(122,90,165,.14);color:var(--c-gram)}
 .tag.user{background:rgba(216,68,46,.10);color:var(--shu)}
 .fav{position:absolute;top:11px;right:11px;border:0;background:none;font-size:20px;line-height:1;
   cursor:pointer;color:#CBC7BC;width:30px;height:30px}
@@ -104,6 +106,7 @@ mark{background:var(--shu-bg);color:var(--shu);font-weight:700;border-radius:3px
    <button class="chip" data-c="單字片語">單字片語</button>
    <button class="chip" data-c="短句">短句練習</button>
    <button class="chip" data-c="長篇">長篇翻譯</button>
+   <button class="chip" data-c="文法">文法</button>
    <button class="chip star" data-c="fav">☆ 收藏</button>
   </div>
   <div class="meta">
@@ -123,12 +126,17 @@ mark{background:var(--shu-bg);color:var(--shu);font-weight:700;border-radius:3px
 /* ===== 設定 ===== */
 // 你也可以直接把試算表 ID 填在這行引號裡；留空的話，第一次開會請你貼上。
 const HARDCODED_SHEET_ID = "";
-const TABS = {"單字片語":"單字片語","短句練習":"短句","長篇翻譯":"長篇"};
+const TABS = [
+  {sheet:"單字片語", cat:"單字片語"},
+  {sheet:"短句練習", cat:"短句"},
+  {sheet:"長篇翻譯", cat:"長篇"},
+  {sheet:"文法", cat:"文法", map:{jp:"文法/句型", zh:"概念", note:["說明／例句"]}},
+];
 /* ================= */
 
-const CATCLASS={'單字片語':'word','短句':'sent','長篇':'long'};
-const CATTAG={'單字片語':'cat-word','短句':'cat-sent','長篇':'cat-long'};
-const CATNAME={'單字片語':'單字片語','短句':'短句','長篇':'長篇'};
+const CATCLASS={'單字片語':'word','短句':'sent','長篇':'long','文法':'gram'};
+const CATTAG={'單字片語':'cat-word','短句':'cat-sent','長篇':'cat-long','文法':'cat-gram'};
+const CATNAME={'單字片語':'單字片語','短句':'短句','長篇':'長篇','文法':'文法'};
 const $=s=>document.querySelector(s);
 const list=$('#list'), qEl=$('#q');
 let DATA=[], cat='all', terms=[], favs=new Set();
@@ -185,21 +193,35 @@ async function loadAll(){
   showLoading();
   try{
     const recs=[];
-    for(const [tab,catName] of Object.entries(TABS)){
+    for(const cfg of TABS){
       let rows;
-      try{ rows=await fetchTab(id, tab); }
+      try{ rows=await fetchTab(id, cfg.sheet); }
       catch(e){ continue; }               // 某分頁不存在就略過
       if(!rows.length) continue;
-      const roles=rows[0].map(colRole);
+      const hdr=rows[0].map(x=>(x||'').trim());
+      const idx=h=>hdr.indexOf(h);
+      const roles = cfg.map ? null : hdr.map(colRole);
       for(let r=1;r<rows.length;r++){
-        const rec={c:catName,jp:'',zh:'',n:'',t:'',s:tab};
-        rows[r].forEach((v,ci)=>{
-          const role=roles[ci]; if(!role) return;
-          v=(v||'').trim();
-          if(role==='jp')rec.jp=v; else if(role==='zh')rec.zh=v;
-          else if(role==='note')rec.n=v; else if(role==='tag')rec.t=v;
-          else if(role==='src'&&v)rec.s=v;
-        });
+        const cells=rows[r].map(x=>(x||'').trim());
+        const rec={c:cfg.cat,jp:'',zh:'',n:'',t:'',s:cfg.sheet};
+        if(cfg.map){
+          const m=cfg.map;
+          if(m.jp && idx(m.jp)>=0) rec.jp=cells[idx(m.jp)]||'';
+          if(m.zh && idx(m.zh)>=0) rec.zh=cells[idx(m.zh)]||'';
+          if(m.tag && idx(m.tag)>=0) rec.t=cells[idx(m.tag)]||'';
+          const notes=[];
+          (m.note||[]).forEach(h=>{const i=idx(h);
+            if(i>=0 && cells[i]) notes.push(m.note.length>1 ? (h+'：'+cells[i]) : cells[i]);});
+          rec.n=notes.join(' ｜ ');
+        }else{
+          cells.forEach((v,ci)=>{
+            const role=roles[ci]; if(!role) return;
+            if(role==='jp')rec.jp=v; else if(role==='zh')rec.zh=v;
+            else if(role==='note')rec.n=v; else if(role==='tag')rec.t=v;
+            else if(role==='src'&&v)rec.s=v;
+          });
+        }
+        if(!rec.jp && !rec.zh && rec.n){ rec.jp=rec.n; rec.n=''; }  // 無標題時提升
         if(rec.jp||rec.zh) recs.push(rec);
       }
     }
