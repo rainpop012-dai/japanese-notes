@@ -181,7 +181,8 @@ function colRole(h){
   return null;
 }
 async function fetchTab(id, tabName){
-  const url=`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}&t=${Date.now()}`;
+  // 指定明確範圍（A1:Z5000），避免中途的空白列把下方資料整段截斷
+  const url=`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}&range=A1:Z5000&t=${Date.now()}`;
   const res=await fetch(url,{cache:'no-store'});
   const txt=await res.text();
   if(!res.ok || txt.trim().startsWith('<')) throw new Error('讀取失敗：'+tabName);
