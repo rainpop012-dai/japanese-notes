@@ -15,18 +15,14 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{margin:0;background:var(--paper);color:var(--ink);}
-body{
-  font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",
+body{font-family:"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",
    "Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
   line-height:1.6;-webkit-font-smoothing:antialiased;
-  padding:0 0 max(28px,env(safe-area-inset-bottom));
-}
+  padding:0 0 max(28px,env(safe-area-inset-bottom));}
 .wrap{max-width:720px;margin:0 auto;padding:0 16px;}
-header{
-  position:sticky;top:0;z-index:20;background:rgba(251,250,247,.92);
+header{position:sticky;top:0;z-index:20;background:rgba(251,250,247,.92);
   backdrop-filter:saturate(1.4) blur(10px);
-  border-bottom:1px solid var(--line);padding-top:max(14px,env(safe-area-inset-top));
-}
+  border-bottom:1px solid var(--line);padding-top:max(14px,env(safe-area-inset-top));}
 .kicker{display:flex;align-items:baseline;gap:8px;margin:0 0 10px}
 .kicker b{font-size:.98rem;font-weight:700;letter-spacing:.14em}
 .kicker span{font-size:.72rem;color:var(--soft);letter-spacing:.12em}
@@ -82,8 +78,11 @@ mark{background:var(--shu-bg);color:var(--shu);font-weight:700;border-radius:3px
 .setup input:focus{outline:none;border-color:var(--shu);box-shadow:0 0 0 3px var(--shu-bg)}
 .btn{background:var(--shu);color:#fff;border:0;border-radius:10px;padding:12px 22px;font-size:.95rem;
   cursor:pointer;font-family:inherit}
-.foot{margin:22px 2px 0;font-size:.72rem;color:var(--soft);display:flex;justify-content:space-between;align-items:center}
-.foot button{border:0;background:none;color:var(--shu);cursor:pointer;font-size:.72rem;font-family:inherit}
+.foot{margin:22px 2px 0;font-size:.72rem;color:var(--soft);display:flex;justify-content:space-between;
+  align-items:flex-start;gap:12px;flex-wrap:wrap}
+.foot .diag{flex:1 1 60%;min-width:0;line-height:1.7}
+.foot .diag .warn{color:var(--shu);font-weight:700}
+.foot button{border:0;background:none;color:var(--shu);cursor:pointer;font-size:.72rem;font-family:inherit;white-space:nowrap}
 .spin{width:22px;height:22px;border:2.5px solid var(--line);border-top-color:var(--shu);
   border-radius:50%;animation:sp .7s linear infinite;margin:0 auto 14px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -117,15 +116,16 @@ mark{background:var(--shu-bg);color:var(--shu);font-weight:700;border-radius:3px
 </header>
 <div class="wrap"><main id="list"></main>
   <div class="foot" id="foot" style="display:none">
-    <span id="loaded"></span>
+    <span class="diag" id="diag"></span>
     <button id="refresh">↻ 重新載入</button>
   </div>
 </div>
 
 <script>
 /* ===== 設定 ===== */
-// 你也可以直接把試算表 ID 填在這行引號裡；留空的話，第一次開會請你貼上。
+// 也可把試算表 ID 直接填在引號裡；留空則第一次開啟時請你貼上。
 const HARDCODED_SHEET_ID = "";
+// 查詢頁會讀取的分頁（有 map 的用精確欄名對應；沒有 map 的用通用判斷）
 const TABS = [
   {sheet:"單字片語", cat:"單字片語"},
   {sheet:"短句練習", cat:"短句"},
@@ -182,7 +182,7 @@ function colRole(h){
 }
 async function fetchTab(id, tabName){
   const url=`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}&t=${Date.now()}`;
-  const res=await fetch(url);
+  const res=await fetch(url,{cache:'no-store'});
   const txt=await res.text();
   if(!res.ok || txt.trim().startsWith('<')) throw new Error('讀取失敗：'+tabName);
   return parseCSV(txt);
@@ -191,16 +191,18 @@ async function loadAll(){
   const id=getSheetId();
   if(!id){ showSetup(); return; }
   showLoading();
+  const diag=[];           // 每分頁診斷
   try{
     const recs=[];
     for(const cfg of TABS){
       let rows;
       try{ rows=await fetchTab(id, cfg.sheet); }
-      catch(e){ continue; }               // 某分頁不存在就略過
-      if(!rows.length) continue;
+      catch(e){ diag.push(`${cfg.sheet} <span class="warn">⚠讀取失敗</span>`); continue; }
+      if(!rows.length){ diag.push(`${cfg.sheet} 0`); continue; }
       const hdr=rows[0].map(x=>(x||'').trim());
       const idx=h=>hdr.indexOf(h);
       const roles = cfg.map ? null : hdr.map(colRole);
+      let n=0;
       for(let r=1;r<rows.length;r++){
         const cells=rows[r].map(x=>(x||'').trim());
         const rec={c:cfg.cat,jp:'',zh:'',n:'',t:'',s:cfg.sheet};
@@ -221,14 +223,16 @@ async function loadAll(){
             else if(role==='src'&&v)rec.s=v;
           });
         }
-        if(!rec.jp && !rec.zh && rec.n){ rec.jp=rec.n; rec.n=''; }  // 無標題時提升
-        if(rec.jp||rec.zh) recs.push(rec);
+        if(!rec.jp && !rec.zh && rec.n){ rec.jp=rec.n; rec.n=''; }
+        if(rec.jp||rec.zh){ recs.push(rec); n++; }
       }
+      diag.push(`${cfg.sheet} ${n}`);
     }
     if(!recs.length) throw new Error('沒讀到資料');
     DATA=recs; DATA.forEach((d,i)=>d._id=i);
     $('#foot').style.display='flex';
-    $('#loaded').textContent='已更新 '+new Date().toLocaleString('zh-TW',{hour12:false});
+    const t=new Date().toLocaleTimeString('zh-TW',{hour12:false});
+    $('#diag').innerHTML=`已更新 ${t}　｜　`+diag.join('・');
     render();
   }catch(e){ showError(); }
 }
@@ -278,7 +282,7 @@ function showError(){
   list.innerHTML=`<div class="state"><div class="big">⚠️</div>
    <p>讀不到試算表內容。請確認：</p>
    <p>① 試算表已設為「知道連結的任何人 → 檢視者」</p>
-   <p>② 分頁名稱是 單字片語 / 短句練習 / 長篇翻譯</p>
+   <p>② 分頁名稱是 單字片語 / 短句練習 / 長篇翻譯 / 文法</p>
    <p>③ 試算表 ID 正確</p>
    <p style="margin-top:14px"><button class="btn" id="reconf">重新設定試算表</button></p></div>`;
   $('#reconf').onclick=showSetup;
@@ -296,7 +300,7 @@ function showSetup(){
   const inp=$('#idin'); inp.focus();
   $('#idok').onclick=()=>{
     let v=inp.value.trim();
-    const m=v.match(/\/d\/([a-zA-Z0-9-_]+)/);   // 貼整條網址也能自動抓 ID
+    const m=v.match(/\/d\/([a-zA-Z0-9-_]+)/);
     if(m) v=m[1];
     if(!v){ inp.focus(); return; }
     setSheetId(v); loadAll();
