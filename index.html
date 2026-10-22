@@ -98,7 +98,7 @@ mark{background:var(--shu-bg);color:var(--shu);font-weight:700;border-radius:3px
 <body>
 <header>
  <div class="wrap">
-  <div class="kicker"><b>日文筆記</b><span>NOTE INDEX · v4</span>
+  <div class="kicker"><b>日文筆記</b><span>NOTE INDEX · v5</span>
     <button class="gear" id="gear" title="設定連結">⚙︎</button></div>
   <div class="search">
    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -110,7 +110,7 @@ mark{background:var(--shu-bg);color:var(--shu);font-weight:700;border-radius:3px
    <button class="chip on" data-c="all">全部</button>
    <button class="chip" data-c="單字片語">單字片語</button>
    <button class="chip" data-c="短句">短句練習</button>
-   <button class="chip" data-c="長篇">長篇翻譯</button>
+   <button class="chip" data-c="中翻日">中翻日練習</button>
    <button class="chip" data-c="文法">文法</button>
    <button class="chip star" data-c="fav">☆ 收藏</button>
   </div>
@@ -133,12 +133,12 @@ mark{background:var(--shu-bg);color:var(--shu);font-weight:700;border-radius:3px
 const TABS = [
   {sheet:"單字片語", cat:"單字片語"},
   {sheet:"短句練習", cat:"短句"},
-  {sheet:"長篇翻譯", cat:"長篇"},
+  {sheet:"中翻日練習", cat:"中翻日"},
   {sheet:"文法", cat:"文法", map:{jp:"文法/句型", zh:"概念", note:["說明／例句"]}},
 ];
-const CATCLASS={'單字片語':'word','短句':'sent','長篇':'long','文法':'gram'};
-const CATTAG={'單字片語':'cat-word','短句':'cat-sent','長篇':'cat-long','文法':'cat-gram'};
-const CATNAME={'單字片語':'單字片語','短句':'短句','長篇':'長篇','文法':'文法'};
+const CATCLASS={'單字片語':'word','短句':'sent','中翻日':'long','文法':'gram'};
+const CATTAG={'單字片語':'cat-word','短句':'cat-sent','中翻日':'cat-long','文法':'cat-gram'};
+const CATNAME={'單字片語':'單字片語','短句':'短句','中翻日':'中翻日練習','文法':'文法'};
 const $=s=>document.querySelector(s);
 const list=$('#list'), qEl=$('#q');
 let DATA=[], cat='all', terms=[], favs=new Set();
@@ -150,7 +150,7 @@ const B="https://docs.google.com/spreadsheets/d/e/2PACX-1vT-22nnMYL-82-iuwTvbJgq
 const DEFAULT_URLS={
   "單字片語": B+"165244829",
   "短句練習": B+"1815302677",
-  "長篇翻譯": B+"706268185",
+  "中翻日練習": B+"1027616742",
   "文法":     B+"705204509",
 };
 function getUrls(){
@@ -264,7 +264,7 @@ function matches(d){
   return terms.every(t=>hay.includes(t.toLowerCase()));
 }
 function card(d){
-  const cls=CATCLASS[d.c], isLong=d.c==='長篇';
+  const cls=CATCLASS[d.c], isLong=d.c==='長篇翻譯';
   const userTag=d.t?`<span class="tag user">${esc(d.t)}</span>`:'';
   return `<article class="card ${cls}${isLong?' clamp':''}" data-id="${d._id}">
     <button class="fav${favs.has(d._id)?' on':''}" data-fav>${favs.has(d._id)?'★':'☆'}</button>
@@ -307,7 +307,7 @@ function showSetup(){
     </div>
     <label>單字片語</label><input id="u0" placeholder="…output=csv" value="${esc(u['單字片語']||'')}">
     <label>短句練習</label><input id="u1" placeholder="…output=csv" value="${esc(u['短句練習']||'')}">
-    <label>長篇翻譯</label><input id="u2" placeholder="…output=csv" value="${esc(u['長篇翻譯']||'')}">
+    <label>中翻日練習</label><input id="u2" placeholder="…output=csv" value="${esc(u['中翻日練習']||'')}">
     <label>文法</label><input id="u3" placeholder="…output=csv" value="${esc(u['文法']||'')}">
     <button class="btn" id="save">儲存並載入</button>
   </div></div>`;
@@ -315,7 +315,7 @@ function showSetup(){
     const o={
       '單字片語':$('#u0').value.trim(),
       '短句練習':$('#u1').value.trim(),
-      '長篇翻譯':$('#u2').value.trim(),
+      '中翻日練習':$('#u2').value.trim(),
       '文法':$('#u3').value.trim(),
     };
     setUrls(o);
