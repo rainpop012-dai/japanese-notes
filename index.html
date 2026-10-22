@@ -69,15 +69,21 @@ main{margin-top:14px;display:flex;flex-direction:column;gap:10px}
 mark{background:var(--shu-bg);color:var(--shu);font-weight:700;border-radius:3px;padding:0 1px}
 .clamp .zh,.clamp .note{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .more{margin-top:8px;font-size:.78rem;color:var(--shu);cursor:pointer;user-select:none;display:inline-block}
-.state{text-align:center;padding:52px 22px;color:var(--soft)}
+.state{text-align:center;padding:44px 22px;color:var(--soft)}
 .state .big{font-size:2.1rem;margin-bottom:10px;opacity:.6}
 .state p{margin:5px 0;font-size:.9rem}
 .state code{background:#F1EEE7;padding:1px 6px;border-radius:5px;font-size:.82rem;word-break:break-all}
-.setup input{width:100%;font-size:16px;padding:12px 14px;border:1.5px solid var(--line);
-  border-radius:10px;margin:14px 0 12px;font-family:inherit}
+.setup{text-align:left;max-width:560px;margin:0 auto}
+.setup h2{font-size:1.05rem;margin:0 0 4px;text-align:center}
+.setup .lead{font-size:.82rem;color:var(--soft);text-align:center;margin-bottom:18px}
+.setup label{display:block;font-size:.8rem;font-weight:700;margin:12px 0 4px}
+.setup input{width:100%;font-size:16px;padding:10px 12px;border:1.5px solid var(--line);
+  border-radius:10px;font-family:inherit}
 .setup input:focus{outline:none;border-color:var(--shu);box-shadow:0 0 0 3px var(--shu-bg)}
+.setup .how{font-size:.78rem;color:var(--soft);background:#F4F1EA;border-radius:10px;padding:12px 14px;margin:16px 0}
+.setup .how b{color:var(--ink)}
 .btn{background:var(--shu);color:#fff;border:0;border-radius:10px;padding:12px 22px;font-size:.95rem;
-  cursor:pointer;font-family:inherit}
+  cursor:pointer;font-family:inherit;display:block;width:100%;margin-top:16px}
 .foot{margin:22px 2px 0;font-size:.72rem;color:var(--soft);display:flex;justify-content:space-between;
   align-items:flex-start;gap:12px;flex-wrap:wrap}
 .foot .diag{flex:1 1 60%;min-width:0;line-height:1.7}
@@ -92,8 +98,8 @@ mark{background:var(--shu-bg);color:var(--shu);font-weight:700;border-radius:3px
 <body>
 <header>
  <div class="wrap">
-  <div class="kicker"><b>日文筆記</b><span>NOTE INDEX · v2</span>
-    <button class="gear" id="gear" title="設定試算表">⚙︎</button></div>
+  <div class="kicker"><b>日文筆記</b><span>NOTE INDEX · v4</span>
+    <button class="gear" id="gear" title="設定連結">⚙︎</button></div>
   <div class="search">
    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
    <input id="q" type="search" inputmode="search" autocomplete="off"
@@ -122,18 +128,14 @@ mark{background:var(--shu-bg);color:var(--shu);font-weight:700;border-radius:3px
 </div>
 
 <script>
-/* ===== 設定 ===== */
-// 也可把試算表 ID 直接填在引號裡；留空則第一次開啟時請你貼上。
-const HARDCODED_SHEET_ID = "";
-// 查詢頁會讀取的分頁（有 map 的用精確欄名對應；沒有 map 的用通用判斷）
+/* 讀「發布到網路」的 CSV（完整內容、不會因空白列截斷）。
+   四個分頁的 CSV 連結在設定畫面（齒輪）貼入，存在本機瀏覽器。 */
 const TABS = [
   {sheet:"單字片語", cat:"單字片語"},
   {sheet:"短句練習", cat:"短句"},
   {sheet:"長篇翻譯", cat:"長篇"},
   {sheet:"文法", cat:"文法", map:{jp:"文法/句型", zh:"概念", note:["說明／例句"]}},
 ];
-/* ================= */
-
 const CATCLASS={'單字片語':'word','短句':'sent','長篇':'long','文法':'gram'};
 const CATTAG={'單字片語':'cat-word','短句':'cat-sent','長篇':'cat-long','文法':'cat-gram'};
 const CATNAME={'單字片語':'單字片語','短句':'短句','長篇':'長篇','文法':'文法'};
@@ -143,13 +145,21 @@ let DATA=[], cat='all', terms=[], favs=new Set();
 try{favs=new Set(JSON.parse(localStorage.getItem('jpfav')||'[]'))}catch(e){}
 function saveFav(){try{localStorage.setItem('jpfav',JSON.stringify([...favs]))}catch(e){}}
 
-function getSheetId(){
-  const p=new URLSearchParams(location.search).get('id');
-  if(p) return p.trim();
-  if(HARDCODED_SHEET_ID) return HARDCODED_SHEET_ID.trim();
-  try{return (localStorage.getItem('jpsheetid')||'').trim()}catch(e){return ''}
+// 已內建、經確認可用的四條「發布到網路」CSV 連結（可在齒輪 ⚙︎ 覆蓋）
+const B="https://docs.google.com/spreadsheets/d/e/2PACX-1vT-22nnMYL-82-iuwTvbJgqMUfloszFyvM9G5auH3_vZYnsg-m6Skqw10oTUXNerZ9qrorE_ARvqCP6/pub?single=true&output=csv&gid=";
+const DEFAULT_URLS={
+  "單字片語": B+"165244829",
+  "短句練習": B+"1815302677",
+  "長篇翻譯": B+"706268185",
+  "文法":     B+"705204509",
+};
+function getUrls(){
+  let s={}; try{s=JSON.parse(localStorage.getItem('jpcsvurls')||'{}')}catch(e){}
+  const o={}; TABS.forEach(t=>{o[t.sheet]=(s[t.sheet]||DEFAULT_URLS[t.sheet]||'').trim();});
+  return o;
 }
-function setSheetId(id){try{localStorage.setItem('jpsheetid',id.trim())}catch(e){}}
+function setUrls(o){ try{localStorage.setItem('jpcsvurls',JSON.stringify(o))}catch(e){} }
+function hasAnyUrl(){ const u=getUrls(); return TABS.some(t=>u[t.sheet]); }
 
 /* ---- CSV 解析（支援欄位內含逗號/引號/換行）---- */
 function parseCSV(text){
@@ -180,25 +190,25 @@ function colRole(h){
   if(h.includes('重點')||h.includes('備註')||h.includes('文法')) return 'note';
   return null;
 }
-async function fetchTab(id, tabName){
-  // 指定明確範圍（A1:Z5000），避免中途的空白列把下方資料整段截斷
-  const url=`https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}&range=A1:Z5000&t=${Date.now()}`;
-  const res=await fetch(url,{cache:'no-store'});
+async function fetchCsv(url){
+  const u=url + (url.includes('?')?'&':'?') + 't=' + Date.now();   // 破快取
+  const res=await fetch(u,{cache:'no-store'});
   const txt=await res.text();
-  if(!res.ok || txt.trim().startsWith('<')) throw new Error('讀取失敗：'+tabName);
+  if(!res.ok || txt.trim().startsWith('<')) throw new Error('讀取失敗');
   return parseCSV(txt);
 }
 async function loadAll(){
-  const id=getSheetId();
-  if(!id){ showSetup(); return; }
+  if(!hasAnyUrl()){ showSetup(); return; }
   showLoading();
-  const diag=[];           // 每分頁診斷
+  const urls=getUrls(); const diag=[];
   try{
     const recs=[];
     for(const cfg of TABS){
+      const url=urls[cfg.sheet];
+      if(!url){ diag.push(`${cfg.sheet} 未設定`); continue; }
       let rows;
-      try{ rows=await fetchTab(id, cfg.sheet); }
-      catch(e){ diag.push(`${cfg.sheet} <span class="warn">⚠讀取失敗</span>`); continue; }
+      try{ rows=await fetchCsv(url); }
+      catch(e){ diag.push(`${cfg.sheet} <span class="warn">⚠失敗</span>`); continue; }
       if(!rows.length){ diag.push(`${cfg.sheet} 0`); continue; }
       const hdr=rows[0].map(x=>(x||'').trim());
       const idx=h=>hdr.indexOf(h);
@@ -224,7 +234,6 @@ async function loadAll(){
             else if(role==='src'&&v)rec.s=v;
           });
         }
-        if(!rec.jp && !rec.zh && rec.n){ rec.jp=rec.n; rec.n=''; }
         if(rec.jp||rec.zh){ recs.push(rec); n++; }
       }
       diag.push(`${cfg.sheet} ${n}`);
@@ -278,33 +287,39 @@ function render(){
   }
   list.innerHTML=res.map(card).join('');
 }
-function showLoading(){ list.innerHTML=`<div class="state"><div class="spin"></div><p>讀取試算表中…</p></div>`; }
+function showLoading(){ list.innerHTML=`<div class="state"><div class="spin"></div><p>讀取中…</p></div>`; }
 function showError(){
   list.innerHTML=`<div class="state"><div class="big">⚠️</div>
-   <p>讀不到試算表內容。請確認：</p>
-   <p>① 試算表已設為「知道連結的任何人 → 檢視者」</p>
-   <p>② 分頁名稱是 單字片語 / 短句練習 / 長篇翻譯 / 文法</p>
-   <p>③ 試算表 ID 正確</p>
-   <p style="margin-top:14px"><button class="btn" id="reconf">重新設定試算表</button></p></div>`;
+   <p>讀不到資料。請確認四個 CSV 連結是「發布到網路」產生的、而且結尾是 <code>output=csv</code>。</p>
+   <p style="margin-top:14px"><button class="btn" id="reconf" style="max-width:220px;margin:0 auto">重新設定連結</button></p></div>`;
   $('#reconf').onclick=showSetup;
 }
 function showSetup(){
   $('#foot').style.display='none';
-  list.innerHTML=`<div class="state setup">
-    <div class="big">🔗</div>
-    <p>貼上你的 Google 試算表 ID 就開始使用</p>
-    <p style="font-size:.8rem">網址中 <code>/d/</code> 和 <code>/edit</code> 之間那一長串</p>
-    <input id="idin" placeholder="例如 1fDDIz2E…bHvVs" value="${esc(getSheetId())}">
-    <button class="btn" id="idok">開始</button>
-    <p style="font-size:.78rem;margin-top:16px">記得先把試算表設為「知道連結的任何人可檢視」</p>
-  </div>`;
-  const inp=$('#idin'); inp.focus();
-  $('#idok').onclick=()=>{
-    let v=inp.value.trim();
-    const m=v.match(/\/d\/([a-zA-Z0-9-_]+)/);
-    if(m) v=m[1];
-    if(!v){ inp.focus(); return; }
-    setSheetId(v); loadAll();
+  const u=getUrls();
+  list.innerHTML=`<div class="state"><div class="setup">
+    <h2>設定分頁連結</h2>
+    <p class="lead">貼上各分頁「發布到網路」的 CSV 連結（可只填有的）</p>
+    <div class="how">
+      取得方式：Google 試算表 →「<b>檔案 → 共用 → 發布到網路</b>」→
+      左邊下拉<b>選一個分頁</b>、右邊格式選 <b>逗號分隔值 (.csv)</b> →「發布」→ <b>複製那條連結</b>。
+      四個分頁各做一次貼到下面。連結長得像 <code>…/pub?gid=…&single=true&output=csv</code>。
+    </div>
+    <label>單字片語</label><input id="u0" placeholder="…output=csv" value="${esc(u['單字片語']||'')}">
+    <label>短句練習</label><input id="u1" placeholder="…output=csv" value="${esc(u['短句練習']||'')}">
+    <label>長篇翻譯</label><input id="u2" placeholder="…output=csv" value="${esc(u['長篇翻譯']||'')}">
+    <label>文法</label><input id="u3" placeholder="…output=csv" value="${esc(u['文法']||'')}">
+    <button class="btn" id="save">儲存並載入</button>
+  </div></div>`;
+  $('#save').onclick=()=>{
+    const o={
+      '單字片語':$('#u0').value.trim(),
+      '短句練習':$('#u1').value.trim(),
+      '長篇翻譯':$('#u2').value.trim(),
+      '文法':$('#u3').value.trim(),
+    };
+    setUrls(o);
+    if(TABS.some(t=>o[t.sheet])) loadAll(); else showSetup();
   };
 }
 /* 事件 */
